@@ -41,9 +41,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* CAT Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-primary rounded-xl mb-4">
-            <span className="text-primary-foreground font-bold text-3xl">CAT</span>
-          </div>
+          <img 
+            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_yUxwN9SIJTwHDlctwXQONXZNcoLBJ1KT7A&s" 
+            alt="Caterpillar Logo"
+            className="h-20 w-auto mx-auto mb-4"
+          />
           <h1 className="text-2xl font-bold text-foreground">Questionnaire Admin</h1>
           <p className="text-muted-foreground mt-1">Employee Exam Management System</p>
         </div>
