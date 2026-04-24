@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -67,9 +68,11 @@ export function AdminHeader({
               </span>
             )}
 
-            <Button variant="outline" size="sm" className="hidden sm:flex">
-              <Eye className="h-4 w-4 mr-2" />
-              Preview
+            <Button variant="outline" size="sm" className="hidden sm:flex" asChild>
+              <Link href="/exam">
+                <Eye className="h-4 w-4 mr-2" />
+                Preview Exam
+              </Link>
             </Button>
 
             <Button
@@ -101,9 +104,11 @@ export function AdminHeader({
                   <Settings className="h-4 w-4 mr-2" />
                   Form Settings
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Preview Form
+                <DropdownMenuItem asChild>
+                  <Link href="/exam">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Preview Exam
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>Export as PDF</DropdownMenuItem>
