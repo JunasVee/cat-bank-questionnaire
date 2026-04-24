@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Loader2,
   Check,
+  Monitor,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -69,6 +70,13 @@ export function AdminHeader({
             )}
 
             <Button variant="outline" size="sm" className="hidden sm:flex" asChild>
+              <Link href="/admin/monitoring">
+                <Monitor className="h-4 w-4 mr-2" />
+                Live Monitor
+              </Link>
+            </Button>
+
+            <Button variant="outline" size="sm" className="hidden sm:flex" asChild>
               <Link href="/exam">
                 <Eye className="h-4 w-4 mr-2" />
                 Preview Exam
@@ -103,6 +111,12 @@ export function AdminHeader({
                 <DropdownMenuItem>
                   <Settings className="h-4 w-4 mr-2" />
                   Form Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/monitoring">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    Live Monitor
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/exam">
