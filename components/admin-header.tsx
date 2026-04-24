@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -11,6 +12,7 @@ import {
   Loader2,
   Check,
   Monitor,
+  LogOut,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -33,6 +35,8 @@ export function AdminHeader({
   isSaving,
   lastSaved,
 }: AdminHeaderProps) {
+  const { logout } = useAuth()
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
       <div className="container mx-auto px-4">
@@ -128,8 +132,9 @@ export function AdminHeader({
                 <DropdownMenuItem>Export as PDF</DropdownMenuItem>
                 <DropdownMenuItem>Duplicate Form</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
-                  Delete Form
+                <DropdownMenuItem onClick={logout} className="text-destructive">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

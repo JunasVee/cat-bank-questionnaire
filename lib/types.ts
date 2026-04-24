@@ -30,6 +30,7 @@ export interface QuestionnaireForm {
   timeLimit: number // in minutes
   passingScore: number
   questions: Question[]
+  isActive: boolean
   createdAt: Date
   updatedAt: Date
 }
