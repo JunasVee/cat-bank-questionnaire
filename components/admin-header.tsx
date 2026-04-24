@@ -44,11 +44,11 @@ export function AdminHeader({
           {/* Logo & Title */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="h-10 w-10 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-black text-lg">
-                  CAT
-                </span>
-              </div>
+              <img 
+                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_yUxwN9SIJTwHDlctwXQONXZNcoLBJ1KT7A&s" 
+                alt="Caterpillar Logo"
+                className="h-10 w-auto"
+              />
               <div className="hidden sm:block">
                 <h1 className="text-lg font-bold text-foreground">
                   Questionnaire Admin
