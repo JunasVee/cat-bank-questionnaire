@@ -1,0 +1,71 @@
+import { QuestionnaireForm } from "./types"
+
+export const mockQuestionnaire: QuestionnaireForm = {
+  id: "q-001",
+  formCode: "CAT-EMP-2024-001",
+  title: "Caterpillar Safety & Operations Assessment",
+  description: "Annual employee assessment covering safety protocols, equipment operation, and company policies.",
+  department: "Operations",
+  timeLimit: 60,
+  passingScore: 70,
+  createdAt: new Date("2024-01-15"),
+  updatedAt: new Date("2024-01-20"),
+  questions: [
+    {
+      id: "q1",
+      text: "What is the primary purpose of the pre-operation inspection checklist for heavy equipment?",
+      type: "multiple-choice",
+      required: true,
+      points: 10,
+      choices: [
+        { id: "q1-a", text: "To delay the start of work", isCorrect: false },
+        { id: "q1-b", text: "To identify potential safety hazards and equipment issues before operation", isCorrect: true },
+        { id: "q1-c", text: "To increase paperwork documentation", isCorrect: false },
+        { id: "q1-d", text: "To satisfy regulatory requirements only", isCorrect: false },
+      ],
+    },
+    {
+      id: "q2",
+      text: "Which of the following are required Personal Protective Equipment (PPE) when operating heavy machinery at CAT facilities? (Select all that apply)",
+      type: "checkbox",
+      required: true,
+      points: 15,
+      choices: [
+        { id: "q2-a", text: "Hard hat", isCorrect: true },
+        { id: "q2-b", text: "Safety glasses", isCorrect: true },
+        { id: "q2-c", text: "Steel-toed boots", isCorrect: true },
+        { id: "q2-d", text: "High-visibility vest", isCorrect: true },
+        { id: "q2-e", text: "Casual footwear", isCorrect: false },
+      ],
+    },
+    {
+      id: "q3",
+      text: "All Caterpillar employees must complete safety training before operating any heavy equipment.",
+      type: "true-false",
+      required: true,
+      points: 10,
+      choices: [
+        { id: "q3-a", text: "True", isCorrect: true },
+        { id: "q3-b", text: "False", isCorrect: false },
+      ],
+    },
+    {
+      id: "q4",
+      text: "What is the maximum load capacity (in tons) for a CAT 320 Excavator?",
+      type: "short-answer",
+      required: true,
+      points: 10,
+      choices: [],
+      correctAnswer: "22",
+    },
+    {
+      id: "q5",
+      text: "Describe the proper procedure for reporting a safety incident at a Caterpillar facility. Include the key steps and who should be notified.",
+      type: "long-answer",
+      required: true,
+      points: 20,
+      choices: [],
+      correctAnswer: "1. Stop work immediately 2. Ensure safety of all personnel 3. Report to immediate supervisor 4. Contact Safety Department 5. Document the incident with photos and written description 6. Cooperate with investigation",
+    },
+  ],
+}
