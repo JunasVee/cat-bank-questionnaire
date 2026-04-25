@@ -44,8 +44,8 @@ export function AdminHeader({
           {/* Logo & Title */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <img 
-                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_yUxwN9SIJTwHDlctwXQONXZNcoLBJ1KT7A&s" 
+              <img
+                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_yUxwN9SIJTwHDlctwXQONXZNcoLBJ1KT7A&s"
                 alt="Caterpillar Logo"
                 className="h-10 w-auto"
               />
@@ -54,7 +54,7 @@ export function AdminHeader({
                   Questionnaire Admin
                 </h1>
                 <p className="text-xs text-muted-foreground">
-                  Employee Exam Management
+                  Employee Bank Questionnaire
                 </p>
               </div>
             </div>
