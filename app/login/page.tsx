@@ -27,7 +27,7 @@ export default function LoginPage() {
     await new Promise((resolve) => setTimeout(resolve, 800))
 
     const success = login(username, password)
-    
+
     if (success) {
       router.push("/")
     } else {
@@ -41,13 +41,13 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* CAT Logo/Header */}
         <div className="text-center mb-8">
-          <img 
-            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_yUxwN9SIJTwHDlctwXQONXZNcoLBJ1KT7A&s" 
+          <img
+            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_yUxwN9SIJTwHDlctwXQONXZNcoLBJ1KT7A&s"
             alt="Caterpillar Logo"
             className="h-20 w-auto mx-auto mb-4"
           />
           <h1 className="text-2xl font-bold text-foreground">Questionnaire Admin</h1>
-          <p className="text-muted-foreground mt-1">Employee Exam Management System</p>
+          <p className="text-muted-foreground mt-1">Employee Bank Questionnaire</p>
         </div>
 
         <Card className="border-border shadow-lg">
@@ -100,8 +100,8 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-primary hover:bg-primary/90"
                 disabled={isLoggingIn}
               >
