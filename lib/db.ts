@@ -2,7 +2,7 @@ import sql from "mssql"
 
 const config: sql.config = {
   server: "103.190.29.70",
-  database: "cat_questionnaire", // You may need to update this with the actual database name
+  database: "master", // You may need to update this with the actual database name
   user: "mitral.sucihr",
   password: "mitral123",
   options: {
@@ -20,7 +20,7 @@ export async function getConnection(): Promise<sql.ConnectionPool> {
   if (pool) {
     return pool
   }
-  
+
   try {
     pool = await sql.connect(config)
     console.log("Database connected successfully")
