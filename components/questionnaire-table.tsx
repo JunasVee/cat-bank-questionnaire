@@ -86,6 +86,11 @@ export function QuestionnaireTable({
     timeLimit: 60,
     passingScore: 70,
   })
+  const [search, setSearch] = useState("")
+  const [departmentFilter, setDepartmentFilter] = useState("all")
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const ITEMS_PER_PAGE = 5
 
   const handleAdd = () => {
     if (!newForm.title || !newForm.formCode) return
@@ -131,8 +136,27 @@ export function QuestionnaireTable({
     })
   }
 
+  const filteredData = questionnaires.filter((q) => {
+    const matchesSearch =
+      q.title.toLowerCase().includes(search.toLowerCase()) ||
+      q.formCode.toLowerCase().includes(search.toLowerCase())
+
+    const matchesDepartment =
+      departmentFilter === "all" || q.department === departmentFilter
+
+    return matchesSearch && matchesDepartment
+  })
+
+  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE)
+
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
   return (
     <div className="bg-card border border-border rounded-lg shadow-sm">
+      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-primary" />
@@ -147,6 +171,40 @@ export function QuestionnaireTable({
         </Button>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 p-4 border-b border-border">
+        <Input
+          placeholder="Search by title or form code..."
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setCurrentPage(1)
+          }}
+          className="sm:max-w-sm"
+        />
+
+        <Select
+          value={departmentFilter}
+          onValueChange={(value) => {
+            setDepartmentFilter(value)
+            setCurrentPage(1)
+          }}
+        >
+          <SelectTrigger className="sm:w-[200px]">
+            <SelectValue placeholder="Filter by department" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Departments</SelectItem>
+            {DEPARTMENTS.map((dept) => (
+              <SelectItem key={dept} value={dept}>
+                {dept}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* List */}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -164,21 +222,20 @@ export function QuestionnaireTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {questionnaires.length === 0 ? (
+            {filteredData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No questionnaires found. Click &quot;Add Questionnaire&quot; to create one.
                 </TableCell>
               </TableRow>
             ) : (
-              questionnaires.map((q) => (
+              paginatedData.map((q) => (
                 <TableRow
                   key={q.id}
-                  className={`cursor-pointer transition-colors ${
-                    activeQuestionnaireId === q.id
-                      ? "bg-primary/10 border-l-4 border-l-primary"
-                      : "hover:bg-muted/50"
-                  }`}
+                  className={`cursor-pointer transition-colors ${activeQuestionnaireId === q.id
+                    ? "bg-primary/10 border-l-4 border-l-primary"
+                    : "hover:bg-muted/50"
+                    }`}
                   onClick={() => onSelect(q)}
                 >
                   <TableCell>
@@ -257,6 +314,32 @@ export function QuestionnaireTable({
         </Table>
       </div>
 
+      <div className="flex items-center justify-between p-4 border-t border-border">
+        <p className="text-sm text-muted-foreground">
+          Page {currentPage} of {totalPages || 1}
+        </p>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((p) => p - 1)}
+          >
+            Previous
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => setCurrentPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+
       {/* Add Questionnaire Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="sm:max-w-md">
@@ -332,8 +415,8 @@ export function QuestionnaireTable({
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleAdd} 
+            <Button
+              onClick={handleAdd}
               disabled={!newForm.title || !newForm.formCode}
               className="bg-primary hover:bg-primary/90"
             >
