@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc \"C:\\\\Users\\\\Lenovo\\\\AppData\\\\Local\\\\Packages\\\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm\\\\LocalState\\\\sessions\\\\4A56CB8C486155A73990817014B8214EB6E414F3\\\\transfers\\\\2026-17\\\\SAR_System_Design_Document.docx\" -o -)",
+      "Bash(cd /d \"C:\\\\Users\\\\Lenovo\\\\AppData\\\\Local\\\\Packages\\\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm\\\\LocalState\\\\sessions\\\\4A56CB8C486155A73990817014B8214EB6E414F3\\\\transfers\\\\2026-17\")",
+      "Bash(python -c ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat: integrate app with SAR_REVAMP SQL Server database' --body ' *)",
+      "PowerShell(Get-Command gh -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\GitHub CLI\\\\\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\\\\GitHub CLI\\\\\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:USERPROFILE\\\\scoop\\\\shims\\\\gh.exe\" -ErrorAction SilentlyContinue)",
+      "Bash(gh pr *)",
+      "Bash(pnpm install *)"
+    ]
+  }
+}
