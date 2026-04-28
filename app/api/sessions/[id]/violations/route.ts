@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getConnection, sql } from "@/lib/db"
 
 // POST /api/sessions/[id]/violations — record a violation event
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const assessmentId = parseInt(params.id)
+    const { id } = await params
+    const assessmentId = parseInt(id)
     const { violationType, description } = await req.json()
 
     const pool = await getConnection()

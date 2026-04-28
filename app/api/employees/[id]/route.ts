@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getConnection, sql } from "@/lib/db"
 
 // GET /api/employees/[id] — look up an employee by employee_id (integer)
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const employeeId = parseInt(params.id)
+    const { id } = await params
+    const employeeId = parseInt(id)
     if (isNaN(employeeId)) {
       return NextResponse.json({ error: "Invalid employee ID" }, { status: 400 })
     }

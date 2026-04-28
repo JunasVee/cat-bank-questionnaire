@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { getConnection, sql } from "@/lib/db"
 
 // GET /api/exam/[formCode] — get a questionnaire by skill_code for the exam page
-export async function GET(req: NextRequest, { params }: { params: { formCode: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ formCode: string }> }) {
   try {
+    const { formCode } = await params
     const pool = await getConnection()
     const result = await pool
       .request()
-      .input("skillCode", sql.VarChar(50), params.formCode)
+      .input("skillCode", sql.VarChar(50), formCode)
       .query(`
         SELECT
           s.skill_id, s.skill_code, s.skill_name, s.description,

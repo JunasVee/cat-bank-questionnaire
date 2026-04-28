@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getConnection, sql } from "@/lib/db"
 
 // GET /api/questionnaires/[id] — full questionnaire with questions and answers
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const skillId = parseInt(params.id)
+    const { id } = await params
+    const skillId = parseInt(id)
     const pool = await getConnection()
 
     const result = await pool
@@ -87,9 +88,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // PUT /api/questionnaires/[id] — save questionnaire metadata + all questions atomically
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const skillId = parseInt(params.id)
+    const { id } = await params
+    const skillId = parseInt(id)
     const body = await req.json()
     const { formCode, title, description, department, timeLimit, passingScore, isActive, questions } = body
 
@@ -236,9 +238,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // DELETE /api/questionnaires/[id]
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const skillId = parseInt(params.id)
+    const { id } = await params
+    const skillId = parseInt(id)
     const pool = await getConnection()
     const transaction = new sql.Transaction(pool)
     await transaction.begin()

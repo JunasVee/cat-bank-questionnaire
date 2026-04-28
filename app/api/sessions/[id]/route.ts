@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getConnection, sql } from "@/lib/db"
 
 // PUT /api/sessions/[id] — update session (submit answers, terminate, complete)
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const assessmentId = parseInt(params.id)
+    const { id } = await params
+    const assessmentId = parseInt(id)
     const body = await req.json()
     const { status, score, totalPoints, earnedPoints, passed, answers } = body
 
