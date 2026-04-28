@@ -11,12 +11,6 @@ export const metadata: Metadata = {
   title: 'CAT Questionnaire Admin | Employee Exam Management',
   description: 'Caterpillar Employee Exam Questionnaire Administration System',
   generator: 'v0.app',
-  icons: {
-    icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-    ],
-    apple: '/icon.svg',
-  },
 }
 
 export default function RootLayout({
