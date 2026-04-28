@@ -4,7 +4,9 @@
       "Bash(git checkout *)",
       "Bash(git add *)",
       "Bash(git commit -m 'fix: replace PanelLeft sidebar toggle icon with hamburger Menu icon *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: replace favicon with CAT yellow logo *)",
+      "Bash(git commit -m 'fix: use app/icon.tsx for favicon \\(Next.js App Router convention\\) *)"
     ]
   }
 }
