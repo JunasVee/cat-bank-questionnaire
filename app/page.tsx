@@ -318,7 +318,7 @@ export default function QuestionnaireAdminPage() {
         {saveStatus === "success" && (
           <Alert className="mb-6 border-green-200 bg-green-50">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-800">Form Saved Successfully</AlertTitle>
+            <AlertTitle className="text-green-800">Form Saved Successfull</AlertTitle>
             <AlertDescription className="text-green-700">
               Your questionnaire has been saved to the database.
             </AlertDescription>
