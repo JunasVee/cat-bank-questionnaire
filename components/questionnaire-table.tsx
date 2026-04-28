@@ -188,7 +188,7 @@ export function QuestionnaireTable({
 
         <Select
           value={departmentFilter}
-          onValueChange={(value) => {
+          onValueChange={(value: string) => {
             setDepartmentFilter(value)
             setCurrentPage(1)
           }}
@@ -268,21 +268,21 @@ export function QuestionnaireTable({
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSelect(q); }}>
+                        <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelect(q); }}>
                           <Pencil className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate(q); }}>
+                        <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onDuplicate(q); }}>
                           <Copy className="h-4 w-4 mr-2" />
                           Duplicate
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onToggleActive(q.id); }}>
+                        <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); onToggleActive(q.id); }}>
                           {q.isActive ? (
                             <>
                               <PowerOff className="h-4 w-4 mr-2" />
@@ -298,7 +298,7 @@ export function QuestionnaireTable({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
-                          onClick={(e) => {
+                          onClick={(e: React.MouseEvent) => {
                             e.stopPropagation()
                             setDeleteTarget(q)
                             setShowDeleteDialog(true)
@@ -375,7 +375,7 @@ export function QuestionnaireTable({
               <Label htmlFor="department">Department</Label>
               <Select
                 value={newForm.department}
-                onValueChange={(value) => setNewForm({ ...newForm, department: value })}
+                onValueChange={(value: string) => setNewForm({ ...newForm, department: value })}
               >
                 <SelectTrigger>
                   <SelectValue />
