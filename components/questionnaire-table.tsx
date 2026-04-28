@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { QuestionnaireForm } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -57,16 +57,6 @@ interface QuestionnaireTableProps {
   onDuplicate: (questionnaire: QuestionnaireForm) => void
 }
 
-const DEPARTMENTS = [
-  "Operations",
-  "Human Resources",
-  "Information Technology",
-  "Maintenance",
-  "Finance",
-  "Sales",
-  "Engineering",
-]
-
 export function QuestionnaireTable({
   questionnaires,
   activeQuestionnaireId,
@@ -76,16 +66,29 @@ export function QuestionnaireTable({
   onToggleActive,
   onDuplicate,
 }: QuestionnaireTableProps) {
+  const [programs, setPrograms] = useState<{ program_id: number; program_name: string }[]>([])
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<QuestionnaireForm | null>(null)
   const [newForm, setNewForm] = useState({
     title: "",
     formCode: "",
-    department: "Operations",
+    department: "",
     timeLimit: 60,
     passingScore: 70,
   })
+
+  useEffect(() => {
+    fetch("/api/programs")
+      .then((r) => r.json())
+      .then((data) => {
+        setPrograms(data)
+        if (data.length > 0) {
+          setNewForm((prev) => ({ ...prev, department: data[0].program_name }))
+        }
+      })
+      .catch(() => {})
+  }, [])
   const [search, setSearch] = useState("")
   const [departmentFilter, setDepartmentFilter] = useState("all")
 
@@ -195,9 +198,9 @@ export function QuestionnaireTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Departments</SelectItem>
-            {DEPARTMENTS.map((dept) => (
-              <SelectItem key={dept} value={dept}>
-                {dept}
+            {programs.map((p) => (
+              <SelectItem key={p.program_id} value={p.program_name}>
+                {p.program_name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -378,9 +381,9 @@ export function QuestionnaireTable({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {DEPARTMENTS.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
+                  {programs.map((p) => (
+                    <SelectItem key={p.program_id} value={p.program_name}>
+                      {p.program_name}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -23,15 +23,12 @@ export default function LoginPage() {
     setError("")
     setIsLoggingIn(true)
 
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    const result = await login(username, password)
 
-    const success = login(username, password)
-
-    if (success) {
+    if (result.success) {
       router.push("/")
     } else {
-      setError("Invalid username or password")
+      setError(result.error ?? "Invalid username or password")
       setIsLoggingIn(false)
     }
   }

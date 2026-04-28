@@ -2,11 +2,12 @@ import sql from "mssql"
 
 const config: sql.config = {
   server: "103.190.29.70",
-  database: "master", // You may need to update this with the actual database name
+  port: 1433,
+  database: "SAR_REVAMP",
   user: "mitral.sucihr",
-  password: "mitral123",
+  password: "StrongPassword#2026",
   options: {
-    encrypt: false, // Set to true if using Azure
+    encrypt: false,
     trustServerCertificate: true,
     enableArithAbort: true,
   },
@@ -17,13 +18,11 @@ const config: sql.config = {
 let pool: sql.ConnectionPool | null = null
 
 export async function getConnection(): Promise<sql.ConnectionPool> {
-  if (pool) {
+  if (pool && pool.connected) {
     return pool
   }
-
   try {
     pool = await sql.connect(config)
-    console.log("Database connected successfully")
     return pool
   } catch (error) {
     console.error("Database connection failed:", error)

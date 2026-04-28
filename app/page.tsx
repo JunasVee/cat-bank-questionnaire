@@ -1,29 +1,71 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { AdminHeader } from "@/components/admin-header"
 import { FormSettings } from "@/components/form-settings"
 import { QuestionCard } from "@/components/question-card"
 import { AddQuestionButton } from "@/components/add-question-button"
 import { QuestionnaireTable } from "@/components/questionnaire-table"
-import { mockQuestionnaires } from "@/lib/mock-data"
 import { Question, QuestionnaireForm, QuestionType } from "@/lib/types"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react"
 
 export default function QuestionnaireAdminPage() {
   const { isAuthenticated, isLoading } = useAuth()
-  const [questionnaires, setQuestionnaires] = useState<QuestionnaireForm[]>(mockQuestionnaires)
-  const [activeQuestionnaireId, setActiveQuestionnaireId] = useState<string | null>(mockQuestionnaires[0]?.id || null)
+  const [questionnaires, setQuestionnaires] = useState<QuestionnaireForm[]>([])
+  const [activeQuestionnaireId, setActiveQuestionnaireId] = useState<string | null>(null)
+  const [isFetching, setIsFetching] = useState(true)
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | undefined>()
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
 
   const activeQuestionnaire = questionnaires.find((q) => q.id === activeQuestionnaireId)
 
-  // Show loading state while checking auth
-  if (isLoading) {
+  // Load questionnaire list on mount
+  useEffect(() => {
+    if (!isAuthenticated) return
+    fetchQuestionnaires()
+  }, [isAuthenticated])
+
+  async function fetchQuestionnaires() {
+    setIsFetching(true)
+    try {
+      const res = await fetch("/api/questionnaires")
+      const data = await res.json()
+      if (res.ok) {
+        setQuestionnaires(data)
+        if (data.length > 0 && !activeQuestionnaireId) {
+          loadQuestionnaire(data[0].id, data)
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch questionnaires", err)
+    } finally {
+      setIsFetching(false)
+    }
+  }
+
+  // Load full questionnaire (with questions) when one is selected
+  async function loadQuestionnaire(id: string, list?: QuestionnaireForm[]) {
+    setIsLoadingQuestions(true)
+    setActiveQuestionnaireId(id)
+    try {
+      const res = await fetch(`/api/questionnaires/${id}`)
+      const data = await res.json()
+      if (res.ok) {
+        const source = list ?? questionnaires
+        setQuestionnaires(source.map((q) => (q.id === id ? { ...q, ...data } : q)))
+      }
+    } catch (err) {
+      console.error("Failed to load questionnaire", err)
+    } finally {
+      setIsLoadingQuestions(false)
+    }
+  }
+
+  if (isLoading || isFetching) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -34,10 +76,7 @@ export default function QuestionnaireAdminPage() {
     )
   }
 
-  // Don't render if not authenticated (will redirect to login)
-  if (!isAuthenticated) {
-    return null
-  }
+  if (!isAuthenticated) return null
 
   const updateFormSettings = (updates: Partial<QuestionnaireForm>) => {
     if (!activeQuestionnaireId) return
@@ -54,11 +93,7 @@ export default function QuestionnaireAdminPage() {
     setQuestionnaires((prev) =>
       prev.map((q) =>
         q.id === activeQuestionnaireId
-          ? {
-              ...q,
-              questions: q.questions.map((qst, i) => (i === index ? question : qst)),
-              updatedAt: new Date(),
-            }
+          ? { ...q, questions: q.questions.map((qst, i) => (i === index ? question : qst)), updatedAt: new Date() }
           : q
       )
     )
@@ -70,11 +105,7 @@ export default function QuestionnaireAdminPage() {
     setQuestionnaires((prev) =>
       prev.map((q) =>
         q.id === activeQuestionnaireId
-          ? {
-              ...q,
-              questions: q.questions.filter((_, i) => i !== index),
-              updatedAt: new Date(),
-            }
+          ? { ...q, questions: q.questions.filter((_, i) => i !== index), updatedAt: new Date() }
           : q
       )
     )
@@ -87,10 +118,7 @@ export default function QuestionnaireAdminPage() {
     const duplicated: Question = {
       ...questionToDuplicate,
       id: `q-${Date.now()}`,
-      choices: questionToDuplicate.choices.map((c) => ({
-        ...c,
-        id: `${c.id}-copy-${Date.now()}`,
-      })),
+      choices: questionToDuplicate.choices.map((c) => ({ ...c, id: `${c.id}-copy-${Date.now()}` })),
     }
     setQuestionnaires((prev) =>
       prev.map((q) => {
@@ -107,15 +135,11 @@ export default function QuestionnaireAdminPage() {
     if (!activeQuestionnaireId || !activeQuestionnaire) return
     const newIndex = direction === "up" ? index - 1 : index + 1
     if (newIndex < 0 || newIndex >= activeQuestionnaire.questions.length) return
-
     setQuestionnaires((prev) =>
       prev.map((q) => {
         if (q.id !== activeQuestionnaireId) return q
         const newQuestions = [...q.questions]
-        ;[newQuestions[index], newQuestions[newIndex]] = [
-          newQuestions[newIndex],
-          newQuestions[index],
-        ]
+        ;[newQuestions[index], newQuestions[newIndex]] = [newQuestions[newIndex], newQuestions[index]]
         return { ...q, questions: newQuestions, updatedAt: new Date() }
       })
     )
@@ -137,14 +161,13 @@ export default function QuestionnaireAdminPage() {
               { id: `tf-f-${Date.now()}`, text: "False", isCorrect: false },
             ]
           : type === "multiple-choice" || type === "checkbox"
-            ? [
-                { id: `opt-1-${Date.now()}`, text: "Option 1", isCorrect: false },
-                { id: `opt-2-${Date.now()}`, text: "Option 2", isCorrect: false },
-              ]
-            : [],
+          ? [
+              { id: `opt-1-${Date.now()}`, text: "Option 1", isCorrect: false },
+              { id: `opt-2-${Date.now()}`, text: "Option 2", isCorrect: false },
+            ]
+          : [],
       correctAnswer: type === "short-answer" || type === "long-answer" ? "" : undefined,
     }
-
     setQuestionnaires((prev) =>
       prev.map((q) =>
         q.id === activeQuestionnaireId
@@ -156,50 +179,98 @@ export default function QuestionnaireAdminPage() {
   }
 
   const handleSave = async () => {
+    if (!activeQuestionnaire) return
     setIsSaving(true)
     setSaveStatus("idle")
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    console.log("Saving form data:", activeQuestionnaire)
-
-    setIsSaving(false)
-    setLastSaved(new Date())
-    setSaveStatus("success")
-
-    setTimeout(() => {
-      setSaveStatus("idle")
-    }, 5000)
-  }
-
-  // Questionnaire Table Handlers
-  const handleSelectQuestionnaire = (questionnaire: QuestionnaireForm) => {
-    setActiveQuestionnaireId(questionnaire.id)
-    setSaveStatus("idle")
-  }
-
-  const handleAddQuestionnaire = (questionnaire: QuestionnaireForm) => {
-    setQuestionnaires((prev) => [...prev, questionnaire])
-    setActiveQuestionnaireId(questionnaire.id)
-  }
-
-  const handleDeleteQuestionnaire = (id: string) => {
-    setQuestionnaires((prev) => prev.filter((q) => q.id !== id))
-    if (activeQuestionnaireId === id) {
-      setActiveQuestionnaireId(questionnaires[0]?.id || null)
+    try {
+      const res = await fetch(`/api/questionnaires/${activeQuestionnaire.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(activeQuestionnaire),
+      })
+      if (res.ok) {
+        // Reload to get updated DB IDs for newly inserted questions
+        await loadQuestionnaire(activeQuestionnaire.id)
+        setLastSaved(new Date())
+        setSaveStatus("success")
+        setTimeout(() => setSaveStatus("idle"), 5000)
+      } else {
+        setSaveStatus("error")
+      }
+    } catch (err) {
+      console.error("Save failed", err)
+      setSaveStatus("error")
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const handleToggleActive = (id: string) => {
-    setQuestionnaires((prev) =>
-      prev.map((q) =>
-        q.id === id ? { ...q, isActive: !q.isActive, updatedAt: new Date() } : q
-      )
-    )
+  const handleSelectQuestionnaire = (questionnaire: QuestionnaireForm) => {
+    setSaveStatus("idle")
+    // Load questions if not yet loaded
+    if (questionnaire.questions.length === 0) {
+      loadQuestionnaire(questionnaire.id)
+    } else {
+      setActiveQuestionnaireId(questionnaire.id)
+    }
   }
 
-  const handleDuplicateQuestionnaire = (questionnaire: QuestionnaireForm) => {
+  const handleAddQuestionnaire = async (questionnaire: QuestionnaireForm) => {
+    try {
+      const res = await fetch("/api/questionnaires", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(questionnaire),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        const newQ: QuestionnaireForm = { ...questionnaire, id: data.id }
+        setQuestionnaires((prev) => [newQ, ...prev])
+        setActiveQuestionnaireId(data.id)
+      }
+    } catch (err) {
+      console.error("Failed to create questionnaire", err)
+    }
+  }
+
+  const handleDeleteQuestionnaire = async (id: string) => {
+    try {
+      const res = await fetch(`/api/questionnaires/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        const remaining = questionnaires.filter((q) => q.id !== id)
+        setQuestionnaires(remaining)
+        if (activeQuestionnaireId === id) {
+          if (remaining.length > 0) {
+            loadQuestionnaire(remaining[0].id, remaining)
+          } else {
+            setActiveQuestionnaireId(null)
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to delete questionnaire", err)
+    }
+  }
+
+  const handleToggleActive = async (id: string) => {
+    const target = questionnaires.find((q) => q.id === id)
+    if (!target) return
+    const updated = { ...target, isActive: !target.isActive }
+    try {
+      const res = await fetch(`/api/questionnaires/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      })
+      if (res.ok) {
+        setQuestionnaires((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      }
+    } catch (err) {
+      console.error("Failed to toggle active status", err)
+    }
+  }
+
+  const handleDuplicateQuestionnaire = async (questionnaire: QuestionnaireForm) => {
     const duplicated: QuestionnaireForm = {
       ...questionnaire,
       id: `q-${Date.now()}`,
@@ -208,17 +279,15 @@ export default function QuestionnaireAdminPage() {
       questions: questionnaire.questions.map((q) => ({
         ...q,
         id: `q-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        choices: q.choices.map((c) => ({
-          ...c,
-          id: `${c.id}-${Date.now()}`,
-        })),
+        choices: q.choices.map((c) => ({ ...c, id: `${c.id}-${Date.now()}` })),
       })),
       isActive: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
-    setQuestionnaires((prev) => [...prev, duplicated])
-    setActiveQuestionnaireId(duplicated.id)
+    await handleAddQuestionnaire(duplicated)
+    // After creation, save questions too
+    // The id is set after API returns — re-save will happen when user clicks save
   }
 
   const totalPoints = activeQuestionnaire?.questions.reduce((sum, q) => sum + q.points, 0) || 0
@@ -234,7 +303,6 @@ export default function QuestionnaireAdminPage() {
       />
 
       <main className="container mx-auto px-4 py-8">
-        {/* Questionnaire Table */}
         <div className="mb-8">
           <QuestionnaireTable
             questionnaires={questionnaires}
@@ -247,19 +315,33 @@ export default function QuestionnaireAdminPage() {
           />
         </div>
 
-        {/* Save Status Alert */}
         {saveStatus === "success" && (
           <Alert className="mb-6 border-green-200 bg-green-50">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-800">Form Saved Successfully</AlertTitle>
             <AlertDescription className="text-green-700">
-              Your questionnaire has been saved. Changes are now live.
+              Your questionnaire has been saved to the database.
             </AlertDescription>
           </Alert>
         )}
 
-        {/* No Questionnaire Selected */}
-        {!activeQuestionnaire && (
+        {saveStatus === "error" && (
+          <Alert className="mb-6 border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertTitle className="text-red-800">Save Failed</AlertTitle>
+            <AlertDescription className="text-red-700">
+              Could not save. Please check your connection and try again.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLoadingQuestions && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        )}
+
+        {!activeQuestionnaire && !isLoadingQuestions && (
           <div className="text-center py-16 bg-card border border-border rounded-lg">
             <p className="text-muted-foreground">
               Select a questionnaire from the table above to edit, or create a new one.
@@ -267,30 +349,24 @@ export default function QuestionnaireAdminPage() {
           </div>
         )}
 
-        {/* Editor Section */}
-        {activeQuestionnaire && (
+        {activeQuestionnaire && !isLoadingQuestions && (
           <>
-            {/* Validation Warning */}
             {activeQuestionnaire.questions.some(
               (q) =>
                 !q.text ||
-                ((q.type === "multiple-choice" ||
-                  q.type === "checkbox" ||
-                  q.type === "true-false") &&
+                ((q.type === "multiple-choice" || q.type === "checkbox" || q.type === "true-false") &&
                   !q.choices.some((c) => c.isCorrect))
             ) && (
               <Alert className="mb-6 border-amber-200 bg-amber-50">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertTitle className="text-amber-800">Incomplete Questions</AlertTitle>
                 <AlertDescription className="text-amber-700">
-                  Some questions are missing text or correct answers. Please review before
-                  publishing.
+                  Some questions are missing text or correct answers. Please review before publishing.
                 </AlertDescription>
               </Alert>
             )}
 
             <div className="grid lg:grid-cols-[1fr_320px] gap-8">
-              {/* Questions List */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-6">
                   <div>
@@ -336,7 +412,6 @@ export default function QuestionnaireAdminPage() {
                 )}
               </div>
 
-              {/* Sidebar - Form Settings */}
               <div className="lg:sticky lg:top-24 lg:h-fit">
                 <FormSettings form={activeQuestionnaire} onUpdate={updateFormSettings} />
               </div>

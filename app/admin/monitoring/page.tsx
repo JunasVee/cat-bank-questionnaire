@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { ExamSession, ViolationRecord } from "@/lib/types"
-import { mockExamSessions } from "@/lib/mock-sessions"
 import { SessionCard } from "@/components/admin/session-card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -38,8 +37,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+const POLL_INTERVAL_MS = 10000
+
 export default function MonitoringPage() {
-  const [sessions, setSessions] = useState<ExamSession[]>(mockExamSessions)
+  const [sessions, setSessions] = useState<ExamSession[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [violationFilter, setViolationFilter] = useState<string>("all")
@@ -52,136 +53,93 @@ export default function MonitoringPage() {
   } | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showTerminateDialog, setShowTerminateDialog] = useState(false)
-  const [sessionToTerminate, setSessionToTerminate] = useState<string | null>(
-    null
-  )
+  const [sessionToTerminate, setSessionToTerminate] = useState<string | null>(null)
 
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulate random violation (10% chance every 5 seconds)
-      if (Math.random() < 0.1) {
-        const inProgressSessions = sessions.filter(
-          (s) => s.status === "in_progress"
-        )
-        if (inProgressSessions.length > 0) {
-          const randomSession =
-            inProgressSessions[
-              Math.floor(Math.random() * inProgressSessions.length)
-            ]
+  const prevSessionsRef = useRef<ExamSession[]>([])
 
-          // Only add violation if under 3
-          if (randomSession.violations.length < 3) {
-            const newViolation: ViolationRecord = {
-              id: `v-${Date.now()}`,
-              type: Math.random() > 0.5 ? "tab_switch" : "window_blur",
-              timestamp: new Date(),
-              description:
-                Math.random() > 0.5
-                  ? "Switched to another browser tab"
-                  : "Clicked outside the exam window",
-            }
+  async function fetchSessions(showRefreshIndicator = false) {
+    if (showRefreshIndicator) setIsRefreshing(true)
+    try {
+      const res = await fetch("/api/sessions")
+      if (!res.ok) return
+      const data: ExamSession[] = await res.json()
 
-            setSessions((prev) =>
-              prev.map((s) => {
-                if (s.id === randomSession.id) {
-                  const updatedViolations = [...s.violations, newViolation]
-                  return {
-                    ...s,
-                    violations: updatedViolations,
-                    // Auto-terminate if 3 violations
-                    status:
-                      updatedViolations.length >= 3 ? "terminated" : s.status,
-                    endTime:
-                      updatedViolations.length >= 3 ? new Date() : s.endTime,
-                    score: updatedViolations.length >= 3 ? 0 : s.score,
-                    totalPoints:
-                      updatedViolations.length >= 3 ? 25 : s.totalPoints,
-                    passed: updatedViolations.length >= 3 ? false : s.passed,
-                  }
-                }
-                return s
-              })
-            )
+      // Detect new violations compared to previous fetch
+      const prev = prevSessionsRef.current
+      const prevViolationIds = new Set(
+        prev.flatMap((s) => s.violations.map((v) => v.id))
+      )
 
-            // Show alert
-            setLatestViolation({ session: randomSession, violation: newViolation })
+      for (const session of data) {
+        for (const violation of session.violations) {
+          if (!prevViolationIds.has(violation.id)) {
+            setLatestViolation({ session, violation })
             setShowViolationAlert(true)
-            setNewViolations((prev) => [newViolation, ...prev])
-
-            // Play sound if enabled
+            setNewViolations((pv) => [violation, ...pv])
             if (soundEnabled) {
               const audio = new Audio(
-                "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleCAGYLfh2oBGFBtUp9vdlUI2J4G86M52TDIyfMPswn5SQi5zr+rThVxLOX677cttXk47cKvq1Y9nVUR7uenHdmFTPXWu6dOOaVpMgLjnwXZjVUF7suzLemVYSH+36saAaFxNhbnlvnJkWER+t+3KfWdaS4G46cV+aV1PhLvownZmXEmBuerIgGtfUIi96MB0Z15KhLvpwXdoX0yHvum/c2deS4a96r1yaF5Lh73qu3FpXkyIvuq6cGlfTIi+6rpwaV5MiL3pu3BoX0yHvuq8cmhfS4i+6rxxaF9MiL7qunBpX0yIveq7cWlfTIe96rpwaV5NiL7qu3BoX0yHvum8cmhfS4i+6rxxaF9MiL7qunBpX0yIveq7cWlfTIe96rpwaV5NiL7qu3BoX0yHvum8cmhfS4i+6rxxaF9MiL7qunBpX0yIveq7cWlfTIe96rpwaV5NiL7qu3BoX0yHvum8cmhfS4i+6rxxaF9MiL7qunBpX0yI"
+                "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleCAGYLfh2oBGFBtUp9vdlUI2J4G86M52TDIyfMPswn5SQi5zr+rThVxLOX677cttXk47cKvq1Y9nVUR7uenHdmFTPXWu6dOOaVpMgLjnwXZjVUF7suzLemVYSH+36saAaFxNhbnlvnJkWER+t+3KfWdaS4G46cV+aV1PhLvownZmXEmBuerIgGtfUIi96MB0Z15KhLvpwXdoX0yHvum/c2deS4a96r1yaF5Lh73qu3FpXkyIvuq6cGlfTIi+6rpwaV5MiL3pu3BoX0yHvuq8cmhfS4i+6rxxaF9MiL7qunBpX0yIveq7cWlfTIe96rpwaV5NiL7qu3BoX0yHvum8cmhfS4i+6rxxaF9MiL7qunBpX0yIveq7cWlfTIe96rpwaV5NiL7qu3BoX0yHvum8cmhfS4i+6rxxaF9MiL7qunBpX0yI"
               )
               audio.volume = 0.5
               audio.play().catch(() => {})
             }
-
-            // Auto-hide alert after 5 seconds
-            setTimeout(() => {
-              setShowViolationAlert(false)
-            }, 5000)
+            setTimeout(() => setShowViolationAlert(false), 5000)
           }
         }
       }
-    }, 5000)
 
-    return () => clearInterval(interval)
-  }, [sessions, soundEnabled])
-
-  const handleRefresh = () => {
-    setIsRefreshing(true)
-    setTimeout(() => {
-      setIsRefreshing(false)
-    }, 1000)
+      prevSessionsRef.current = data
+      setSessions(data)
+    } catch (err) {
+      console.error("Failed to fetch sessions", err)
+    } finally {
+      if (showRefreshIndicator) setIsRefreshing(false)
+    }
   }
+
+  // Initial load + polling
+  useEffect(() => {
+    fetchSessions()
+    const interval = setInterval(() => fetchSessions(), POLL_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [soundEnabled])
+
+  const handleRefresh = () => fetchSessions(true)
 
   const handleTerminate = (sessionId: string) => {
     setSessionToTerminate(sessionId)
     setShowTerminateDialog(true)
   }
 
-  const confirmTerminate = () => {
-    if (sessionToTerminate) {
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionToTerminate
-            ? {
-                ...s,
-                status: "terminated" as const,
-                endTime: new Date(),
-                score: 0,
-                totalPoints: 25,
-                passed: false,
-              }
-            : s
-        )
-      )
+  const confirmTerminate = async () => {
+    if (!sessionToTerminate) return
+    try {
+      await fetch(`/api/sessions/${sessionToTerminate}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "terminated", score: 0, totalPoints: 0, earnedPoints: 0, passed: false }),
+      })
+      await fetchSessions()
+    } catch (err) {
+      console.error("Failed to terminate session", err)
+    } finally {
+      setShowTerminateDialog(false)
+      setSessionToTerminate(null)
     }
-    setShowTerminateDialog(false)
-    setSessionToTerminate(null)
   }
 
-  // Filter sessions
   const filteredSessions = sessions.filter((session) => {
     const matchesSearch =
       session.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       session.employeeId.toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesStatus =
-      statusFilter === "all" || session.status === statusFilter
-
+    const matchesStatus = statusFilter === "all" || session.status === statusFilter
     const matchesViolation =
       violationFilter === "all" ||
-      (violationFilter === "with_violations" &&
-        session.violations.length > 0) ||
+      (violationFilter === "with_violations" && session.violations.length > 0) ||
       (violationFilter === "no_violations" && session.violations.length === 0)
-
     return matchesSearch && matchesStatus && matchesViolation
   })
 
-  // Stats
   const stats = {
     total: sessions.length,
     inProgress: sessions.filter((s) => s.status === "in_progress").length,
@@ -205,41 +163,20 @@ export default function MonitoringPage() {
               </Button>
               <div className="h-6 w-px bg-border" />
               <div>
-                <h1 className="text-xl font-bold text-foreground">
-                  Exam Monitoring Dashboard
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Form: CAT-EMP-2024-001
-                </p>
+                <h1 className="text-xl font-bold text-foreground">Exam Monitoring Dashboard</h1>
+                <p className="text-sm text-muted-foreground">Live data · refreshes every 10s</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSoundEnabled(!soundEnabled)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setSoundEnabled(!soundEnabled)}>
                 {soundEnabled ? (
-                  <>
-                    <Volume2 className="h-4 w-4 mr-1" />
-                    Sound On
-                  </>
+                  <><Volume2 className="h-4 w-4 mr-1" />Sound On</>
                 ) : (
-                  <>
-                    <VolumeX className="h-4 w-4 mr-1" />
-                    Sound Off
-                  </>
+                  <><VolumeX className="h-4 w-4 mr-1" />Sound Off</>
                 )}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-              >
-                <RefreshCw
-                  className={`h-4 w-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`}
-                />
+              <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+                <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? "animate-spin" : ""}`} />
                 Refresh
               </Button>
               {newViolations.length > 0 && (
@@ -261,8 +198,7 @@ export default function MonitoringPage() {
               <AlertTriangle className="h-5 w-5" />
               <span className="font-medium">
                 VIOLATION DETECTED: {latestViolation.session.employeeName} (
-                {latestViolation.session.employeeId}) -{" "}
-                {latestViolation.violation.description}
+                {latestViolation.session.employeeId}) — {latestViolation.violation.description}
               </span>
             </div>
             <Button
@@ -282,9 +218,7 @@ export default function MonitoringPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Sessions
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Sessions</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
@@ -295,61 +229,45 @@ export default function MonitoringPage() {
           </Card>
           <Card className="bg-blue-50 border-blue-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-blue-600">
-                In Progress
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-blue-600">In Progress</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5 text-blue-500" />
-                <span className="text-2xl font-bold text-blue-700">
-                  {stats.inProgress}
-                </span>
+                <span className="text-2xl font-bold text-blue-700">{stats.inProgress}</span>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-green-50 border-green-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-green-600">
-                Completed
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-green-600">Completed</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-green-500" />
-                <span className="text-2xl font-bold text-green-700">
-                  {stats.completed}
-                </span>
+                <span className="text-2xl font-bold text-green-700">{stats.completed}</span>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-red-50 border-red-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-red-600">
-                Terminated
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-red-600">Terminated</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <XCircle className="h-5 w-5 text-red-500" />
-                <span className="text-2xl font-bold text-red-700">
-                  {stats.terminated}
-                </span>
+                <span className="text-2xl font-bold text-red-700">{stats.terminated}</span>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-amber-50 border-amber-200">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-amber-600">
-                With Violations
-              </CardTitle>
+              <CardTitle className="text-sm font-medium text-amber-600">With Violations</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-amber-500" />
-                <span className="text-2xl font-bold text-amber-700">
-                  {stats.withViolations}
-                </span>
+                <span className="text-2xl font-bold text-amber-700">{stats.withViolations}</span>
               </div>
             </CardContent>
           </Card>
@@ -392,11 +310,7 @@ export default function MonitoringPage() {
         {/* Session Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredSessions.map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              onTerminate={handleTerminate}
-            />
+            <SessionCard key={session.id} session={session} onTerminate={handleTerminate} />
           ))}
         </div>
 
@@ -414,21 +328,13 @@ export default function MonitoringPage() {
           <DialogHeader>
             <DialogTitle>Terminate Exam Session?</DialogTitle>
             <DialogDescription>
-              This will immediately end the exam for this employee. Their
-              current progress will be marked as terminated with a score of 0.
-              This action cannot be undone.
+              This will immediately end the exam for this employee. Their current progress will be
+              marked as terminated with a score of 0. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowTerminateDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmTerminate}>
-              Terminate Session
-            </Button>
+            <Button variant="outline" onClick={() => setShowTerminateDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmTerminate}>Terminate Session</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

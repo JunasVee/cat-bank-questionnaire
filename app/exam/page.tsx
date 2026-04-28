@@ -8,8 +8,7 @@ import {
   Send,
   AlertTriangle,
   CheckCircle2,
-  Eye,
-  EyeOff,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,31 +33,45 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { mockQuestionnaire } from "@/lib/mock-data"
 import { useTabVisibility, TabViolation } from "@/hooks/use-tab-visibility"
 import { useExamTimer } from "@/hooks/use-exam-timer"
 import { ExamHeader } from "@/components/exam/exam-header"
 import { ExamQuestionCard } from "@/components/exam/exam-question-card"
 import { ViolationWarning } from "@/components/exam/violation-warning"
+import { QuestionnaireForm } from "@/lib/types"
 
 const MAX_VIOLATIONS = 3
+
+type ExamStep = "identify" | "select" | "exam" | "result"
 
 interface ExamAnswers {
   [questionId: string]: string | string[]
 }
 
+interface EmployeeInfo {
+  id: number
+  name: string
+  department: string
+  programId: number
+}
+
 export default function ExamPage() {
   const router = useRouter()
-  const [examStarted, setExamStarted] = useState(false)
-  const [examSubmitted, setExamSubmitted] = useState(false)
+  const [step, setStep] = useState<ExamStep>("identify")
+  const [employeeIdInput, setEmployeeIdInput] = useState("")
+  const [employeeInfo, setEmployeeInfo] = useState<EmployeeInfo | null>(null)
+  const [availableQuestionnaires, setAvailableQuestionnaires] = useState<QuestionnaireForm[]>([])
+  const [form, setForm] = useState<QuestionnaireForm | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<ExamAnswers>({})
-  const [employeeId, setEmployeeId] = useState("")
-  const [employeeName, setEmployeeName] = useState("")
   const [showViolationWarning, setShowViolationWarning] = useState(false)
   const [latestViolation, setLatestViolation] = useState<TabViolation | null>(null)
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [showTimeUpDialog, setShowTimeUpDialog] = useState(false)
+  const [isLookingUp, setIsLookingUp] = useState(false)
+  const [lookupError, setLookupError] = useState("")
+  const [isLoadingForm, setIsLoadingForm] = useState(false)
   const [submissionResult, setSubmissionResult] = useState<{
     score: number
     passed: boolean
@@ -66,68 +79,112 @@ export default function ExamPage() {
     earnedPoints: number
   } | null>(null)
 
-  const form = mockQuestionnaire
-  const totalQuestions = form.questions.length
+  const examStarted = step === "exam"
+  const examSubmitted = step === "result"
 
   // Tab visibility detection
-  const handleViolation = useCallback((violation: TabViolation) => {
-    if (examStarted && !examSubmitted) {
+  const handleViolation = useCallback(
+    async (violation: TabViolation) => {
+      if (!examStarted || examSubmitted) return
       setLatestViolation(violation)
       setShowViolationWarning(true)
-    }
-  }, [examStarted, examSubmitted])
+
+      // Persist violation to DB
+      if (sessionId) {
+        try {
+          await fetch(`/api/sessions/${sessionId}/violations`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              violationType: violation.type,
+              description: violation.description,
+            }),
+          })
+        } catch {}
+      }
+    },
+    [examStarted, examSubmitted, sessionId]
+  )
 
   const { violations, violationCount } = useTabVisibility(handleViolation)
 
-  // Auto-submit when max violations reached
   useEffect(() => {
     if (violationCount >= MAX_VIOLATIONS && examStarted && !examSubmitted) {
       handleSubmitExam()
     }
   }, [violationCount, examStarted, examSubmitted])
 
-  // Exam timer
   const handleTimeExpired = useCallback(() => {
     if (examStarted && !examSubmitted) {
       setShowTimeUpDialog(true)
     }
   }, [examStarted, examSubmitted])
 
-  const { formattedTime, timeRemaining, start: startTimer, isExpired } = useExamTimer(
-    form.timeLimit,
+  const { formattedTime, timeRemaining, start: startTimer } = useExamTimer(
+    form?.timeLimit ?? 60,
     handleTimeExpired
   )
 
-  const currentQuestion = form.questions[currentQuestionIndex]
-
-  const handleStartExam = () => {
-    if (!employeeId.trim() || !employeeName.trim()) {
+  const handleLookupEmployee = async () => {
+    const id = parseInt(employeeIdInput.trim())
+    if (isNaN(id)) {
+      setLookupError("Please enter a valid numeric employee ID.")
       return
     }
-    setExamStarted(true)
-    startTimer()
-  }
+    setIsLookingUp(true)
+    setLookupError("")
+    try {
+      const res = await fetch(`/api/employees/${id}`)
+      if (!res.ok) {
+        setLookupError("Employee not found. Please check your ID.")
+        return
+      }
+      const data = await res.json()
+      setEmployeeInfo({ id: data.id, name: data.name, department: data.department, programId: data.programId })
 
-  const handleAnswerChange = (questionId: string, answer: string | string[]) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: answer,
-    }))
-  }
-
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1)
+      // Load questionnaires for this employee's program
+      const qRes = await fetch(`/api/questionnaires?programId=${data.programId}&active=true`)
+      const qData = await qRes.json()
+      setAvailableQuestionnaires(qRes.ok ? qData : [])
+      setStep("select")
+    } catch {
+      setLookupError("Network error. Please try again.")
+    } finally {
+      setIsLookingUp(false)
     }
   }
 
-  const handlePrevQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1)
+  const handleSelectQuestionnaire = async (formCode: string) => {
+    setIsLoadingForm(true)
+    try {
+      const res = await fetch(`/api/exam/${formCode}`)
+      if (!res.ok) {
+        return
+      }
+      const data = await res.json()
+      setForm(data)
+
+      // Start exam session in DB
+      const sessionRes = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId: employeeInfo!.id, skillId: data.id }),
+      })
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json()
+        setSessionId(sessionData.id)
+      }
+
+      setStep("exam")
+      startTimer()
+    } catch {
+    } finally {
+      setIsLoadingForm(false)
     }
   }
 
   const calculateScore = () => {
+    if (!form) return { score: 0, passed: false, totalPoints: 0, earnedPoints: 0 }
     let earnedPoints = 0
     let totalPoints = 0
 
@@ -141,18 +198,12 @@ export default function ExamPage() {
           earnedPoints += question.points
         }
       } else if (question.type === "checkbox") {
-        const correctIds = question.choices
-          .filter((c) => c.isCorrect)
-          .map((c) => c.id)
-          .sort()
-        const userIds = Array.isArray(userAnswer)
-          ? [...userAnswer].sort()
-          : []
+        const correctIds = question.choices.filter((c) => c.isCorrect).map((c) => c.id).sort()
+        const userIds = Array.isArray(userAnswer) ? [...userAnswer].sort() : []
         if (JSON.stringify(correctIds) === JSON.stringify(userIds)) {
           earnedPoints += question.points
         }
       } else if (question.type === "short-answer") {
-        // Simple exact match for demo
         if (
           typeof userAnswer === "string" &&
           userAnswer.trim().toLowerCase() === question.correctAnswer?.toLowerCase()
@@ -160,42 +211,53 @@ export default function ExamPage() {
           earnedPoints += question.points
         }
       }
-      // Long answer would need manual grading
     })
 
-    const score = Math.round((earnedPoints / totalPoints) * 100)
-    return {
-      score,
-      passed: score >= form.passingScore,
-      totalPoints,
-      earnedPoints,
-    }
+    const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0
+    return { score, passed: score >= (form.passingScore ?? 70), totalPoints, earnedPoints }
   }
 
-  const handleSubmitExam = () => {
+  const handleSubmitExam = async () => {
+    if (!form) return
     const result = calculateScore()
     setSubmissionResult(result)
-    setExamSubmitted(true)
     setShowSubmitConfirm(false)
     setShowTimeUpDialog(false)
+
+    // Persist session result to DB
+    if (sessionId) {
+      try {
+        await fetch(`/api/sessions/${sessionId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: violationCount >= MAX_VIOLATIONS ? "terminated" : "completed",
+            score: result.score,
+            totalPoints: result.totalPoints,
+            earnedPoints: result.earnedPoints,
+            passed: result.passed,
+            answers,
+          }),
+        })
+      } catch {}
+    }
+
+    setStep("result")
   }
 
-  const getAnsweredCount = () => {
-    return Object.keys(answers).filter((key) => {
-      const answer = answers[key]
-      if (Array.isArray(answer)) return answer.length > 0
-      return answer && answer.trim() !== ""
+  const getAnsweredCount = () =>
+    Object.keys(answers).filter((key) => {
+      const a = answers[key]
+      return Array.isArray(a) ? a.length > 0 : a && String(a).trim() !== ""
     }).length
-  }
 
   const isQuestionAnswered = (questionId: string) => {
-    const answer = answers[questionId]
-    if (Array.isArray(answer)) return answer.length > 0
-    return answer && answer.trim() !== ""
+    const a = answers[questionId]
+    return Array.isArray(a) ? a.length > 0 : a && String(a).trim() !== ""
   }
 
-  // Start Screen
-  if (!examStarted) {
+  // Step 1: Employee ID entry
+  if (step === "identify") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-lg">
@@ -203,71 +265,43 @@ export default function ExamPage() {
             <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
               <span className="font-bold text-primary-foreground text-2xl">CAT</span>
             </div>
-            <CardTitle className="text-2xl">{form.title}</CardTitle>
-            <p className="text-muted-foreground text-sm mt-2">{form.description}</p>
+            <CardTitle className="text-2xl">Employee Exam Portal</CardTitle>
+            <p className="text-muted-foreground text-sm mt-2">
+              Enter your employee ID to access available exams
+            </p>
           </CardHeader>
-          <CardContent className="pt-6 space-y-6">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <p className="text-muted-foreground">Form Code</p>
-                <p className="font-medium">{form.formCode}</p>
+          <CardContent className="pt-6 space-y-4">
+            {lookupError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                {lookupError}
               </div>
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <p className="text-muted-foreground">Department</p>
-                <p className="font-medium">{form.department}</p>
-              </div>
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <p className="text-muted-foreground">Time Limit</p>
-                <p className="font-medium">{form.timeLimit} minutes</p>
-              </div>
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <p className="text-muted-foreground">Questions</p>
-                <p className="font-medium">{totalQuestions} questions</p>
-              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="employeeId">Employee ID</Label>
+              <Input
+                id="employeeId"
+                type="number"
+                placeholder="Enter your numeric employee ID"
+                value={employeeIdInput}
+                onChange={(e) => setEmployeeIdInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLookupEmployee()}
+                disabled={isLookingUp}
+              />
             </div>
-
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium text-orange-800">Anti-Cheating Monitoring</p>
-                  <p className="text-orange-700 mt-1">
-                    This exam monitors your browser activity. Switching tabs or leaving
-                    the exam window will be recorded. After {MAX_VIOLATIONS} violations,
-                    your exam will be automatically submitted.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="employeeId">Employee ID *</Label>
-                <Input
-                  id="employeeId"
-                  placeholder="Enter your employee ID"
-                  value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="employeeName">Full Name *</Label>
-                <Input
-                  id="employeeName"
-                  placeholder="Enter your full name"
-                  value={employeeName}
-                  onChange={(e) => setEmployeeName(e.target.value)}
-                />
-              </div>
-            </div>
-
             <Button
-              onClick={handleStartExam}
-              disabled={!employeeId.trim() || !employeeName.trim()}
+              onClick={handleLookupEmployee}
+              disabled={!employeeIdInput.trim() || isLookingUp}
               className="w-full"
               size="lg"
             >
-              Start Exam
+              {isLookingUp ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Looking up...
+                </>
+              ) : (
+                "Continue"
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -275,17 +309,81 @@ export default function ExamPage() {
     )
   }
 
-  // Results Screen
-  if (examSubmitted && submissionResult) {
+  // Step 2: Select questionnaire
+  if (step === "select") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center border-b">
+            <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center mx-auto mb-4">
+              <span className="font-bold text-primary-foreground text-2xl">CAT</span>
+            </div>
+            <CardTitle className="text-xl">Welcome, {employeeInfo?.name}</CardTitle>
+            <p className="text-muted-foreground text-sm mt-1">{employeeInfo?.department}</p>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            <p className="text-sm font-medium text-foreground">Available Exams</p>
+            {isLoadingForm && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            )}
+            {!isLoadingForm && availableQuestionnaires.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No exams available for your program at this time.
+              </div>
+            )}
+            {!isLoadingForm &&
+              availableQuestionnaires.map((q) => (
+                <div
+                  key={q.id}
+                  className="border border-border rounded-lg p-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => handleSelectQuestionnaire(q.formCode)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-foreground">{q.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1 font-mono">{q.formCode}</p>
+                      {q.description && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{q.description}</p>
+                      )}
+                    </div>
+                    <Badge variant="outline" className="shrink-0">
+                      {q.timeLimit} min
+                    </Badge>
+                  </div>
+                  <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
+                    <span>{(q as any).questionCount ?? q.questions.length} questions</span>
+                    <span>Pass: {q.passingScore}%</span>
+                  </div>
+                </div>
+              ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => setStep("identify")}
+            >
+              Back
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const totalQuestions = form?.questions.length ?? 0
+  const currentQuestion = form?.questions[currentQuestionIndex]
+
+  // Step 4: Results
+  if (step === "result" && submissionResult) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-lg">
           <CardHeader className="text-center border-b">
             <div
               className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                submissionResult.passed
-                  ? "bg-green-100 text-green-600"
-                  : "bg-red-100 text-red-600"
+                submissionResult.passed ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
               }`}
             >
               {submissionResult.passed ? (
@@ -305,9 +403,7 @@ export default function ExamPage() {
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
             <div className="text-center">
-              <p className="text-6xl font-bold text-foreground">
-                {submissionResult.score}%
-              </p>
+              <p className="text-6xl font-bold text-foreground">{submissionResult.score}%</p>
               <p className="text-muted-foreground mt-2">
                 {submissionResult.earnedPoints} / {submissionResult.totalPoints} points
               </p>
@@ -316,31 +412,21 @@ export default function ExamPage() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="bg-muted/50 p-3 rounded-lg">
                 <p className="text-muted-foreground">Passing Score</p>
-                <p className="font-medium">{form.passingScore}%</p>
+                <p className="font-medium">{form?.passingScore}%</p>
               </div>
               <div className="bg-muted/50 p-3 rounded-lg">
                 <p className="text-muted-foreground">Your Score</p>
-                <p
-                  className={`font-medium ${
-                    submissionResult.passed ? "text-green-600" : "text-red-600"
-                  }`}
-                >
+                <p className={`font-medium ${submissionResult.passed ? "text-green-600" : "text-red-600"}`}>
                   {submissionResult.score}%
                 </p>
               </div>
               <div className="bg-muted/50 p-3 rounded-lg">
                 <p className="text-muted-foreground">Questions Answered</p>
-                <p className="font-medium">
-                  {getAnsweredCount()} / {totalQuestions}
-                </p>
+                <p className="font-medium">{getAnsweredCount()} / {totalQuestions}</p>
               </div>
               <div className="bg-muted/50 p-3 rounded-lg">
                 <p className="text-muted-foreground">Tab Violations</p>
-                <p
-                  className={`font-medium ${
-                    violationCount > 0 ? "text-red-600" : "text-green-600"
-                  }`}
-                >
+                <p className={`font-medium ${violationCount > 0 ? "text-red-600" : "text-green-600"}`}>
                   {violationCount}
                 </p>
               </div>
@@ -355,8 +441,7 @@ export default function ExamPage() {
                       {violationCount} violation{violationCount !== 1 ? "s" : ""} recorded
                     </p>
                     <p className="text-red-700 mt-1">
-                      Your exam administrator has been notified and may review your
-                      results.
+                      Your exam administrator has been notified and may review your results.
                     </p>
                   </div>
                 </div>
@@ -364,15 +449,14 @@ export default function ExamPage() {
             )}
 
             <div className="text-center text-sm text-muted-foreground">
-              <p>Employee: {employeeName}</p>
-              <p>ID: {employeeId}</p>
+              <p>Employee: {employeeInfo?.name}</p>
+              <p>ID: {employeeInfo?.id}</p>
               <p className="mt-2">
-                Submitted on {new Date().toLocaleDateString()} at{" "}
-                {new Date().toLocaleTimeString()}
+                Submitted on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
               </p>
             </div>
 
-            <Button onClick={() => router.push("/")} variant="outline" className="w-full">
+            <Button onClick={() => setStep("identify")} variant="outline" className="w-full">
               Return to Home
             </Button>
           </CardContent>
@@ -381,7 +465,9 @@ export default function ExamPage() {
     )
   }
 
-  // Exam Screen
+  // Step 3: Exam
+  if (!form || !currentQuestion) return null
+
   return (
     <div className="min-h-screen bg-background">
       <ExamHeader
@@ -396,7 +482,6 @@ export default function ExamPage() {
       />
 
       <main className="max-w-3xl mx-auto px-4 py-6">
-        {/* Question Navigation Pills */}
         <div className="flex flex-wrap gap-2 mb-6">
           {form.questions.map((q, index) => (
             <button
@@ -415,33 +500,21 @@ export default function ExamPage() {
           ))}
         </div>
 
-        {/* Current Question */}
         <ExamQuestionCard
           question={currentQuestion}
           questionNumber={currentQuestionIndex + 1}
           answer={answers[currentQuestion.id] || (currentQuestion.type === "checkbox" ? [] : "")}
-          onAnswerChange={handleAnswerChange}
+          onAnswerChange={(qId, ans) => setAnswers((prev) => ({ ...prev, [qId]: ans }))}
         />
 
-        {/* Navigation */}
         <div className="flex items-center justify-between mt-6">
-          <Button
-            variant="outline"
-            onClick={handlePrevQuestion}
-            disabled={currentQuestionIndex === 0}
-          >
+          <Button variant="outline" onClick={() => setCurrentQuestionIndex((p) => p - 1)} disabled={currentQuestionIndex === 0}>
             <ChevronLeft className="h-4 w-4 mr-2" />
             Previous
           </Button>
-
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">
-              {getAnsweredCount()} of {totalQuestions} answered
-            </Badge>
-          </div>
-
+          <Badge variant="secondary">{getAnsweredCount()} of {totalQuestions} answered</Badge>
           {currentQuestionIndex < totalQuestions - 1 ? (
-            <Button onClick={handleNextQuestion}>
+            <Button onClick={() => setCurrentQuestionIndex((p) => p + 1)}>
               Next
               <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
@@ -454,7 +527,6 @@ export default function ExamPage() {
         </div>
       </main>
 
-      {/* Violation Warning Modal */}
       <ViolationWarning
         open={showViolationWarning}
         onClose={() => setShowViolationWarning(false)}
@@ -463,7 +535,6 @@ export default function ExamPage() {
         maxViolations={MAX_VIOLATIONS}
       />
 
-      {/* Submit Confirmation */}
       <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -472,25 +543,19 @@ export default function ExamPage() {
               You have answered {getAnsweredCount()} of {totalQuestions} questions.
               {getAnsweredCount() < totalQuestions && (
                 <span className="block mt-2 text-orange-600 font-medium">
-                  Warning: You have {totalQuestions - getAnsweredCount()} unanswered
-                  question{totalQuestions - getAnsweredCount() !== 1 ? "s" : ""}.
+                  Warning: You have {totalQuestions - getAnsweredCount()} unanswered question{totalQuestions - getAnsweredCount() !== 1 ? "s" : ""}.
                 </span>
               )}
-              <span className="block mt-2">
-                Once submitted, you cannot modify your answers.
-              </span>
+              <span className="block mt-2">Once submitted, you cannot modify your answers.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Continue Exam</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSubmitExam}>
-              Submit Exam
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleSubmitExam}>Submit Exam</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Time Up Dialog */}
       <Dialog open={showTimeUpDialog} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md" showCloseButton={false}>
           <DialogHeader>

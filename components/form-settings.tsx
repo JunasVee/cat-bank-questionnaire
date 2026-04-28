@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,20 +21,16 @@ interface FormSettingsProps {
   onUpdate: (updates: Partial<QuestionnaireForm>) => void
 }
 
-const departments = [
-  "Operations",
-  "Engineering",
-  "Manufacturing",
-  "Safety",
-  "Human Resources",
-  "Finance",
-  "IT",
-  "Sales",
-  "Marketing",
-]
-
 export function FormSettings({ form, onUpdate }: FormSettingsProps) {
+  const [programs, setPrograms] = useState<{ program_id: number; program_name: string }[]>([])
   const totalPoints = form.questions.reduce((sum, q) => sum + q.points, 0)
+
+  useEffect(() => {
+    fetch("/api/programs")
+      .then((r) => r.json())
+      .then(setPrograms)
+      .catch(() => {})
+  }, [])
 
   return (
     <Card className="border-primary/20">
@@ -101,9 +98,9 @@ export function FormSettings({ form, onUpdate }: FormSettingsProps) {
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
-              {departments.map((dept) => (
-                <SelectItem key={dept} value={dept}>
-                  {dept}
+              {programs.map((p) => (
+                <SelectItem key={p.program_id} value={p.program_name}>
+                  {p.program_name}
                 </SelectItem>
               ))}
             </SelectContent>
