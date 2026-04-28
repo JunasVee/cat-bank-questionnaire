@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(git checkout *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: replace PanelLeft sidebar toggle icon with hamburger Menu icon *)",
+      "Bash(git push *)"
     ]
   }
 }
