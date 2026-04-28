@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       .request()
       .input("username", sql.VarChar(50), username)
       .query(`
-        SELECT e.employee_id, e.username, e.password_hash, e.name, r.role_name
+        SELECT e.employee_id, e.username, e.password_hash, e.name, e.program_id, r.role_name
         FROM mst_employee e
         JOIN mst_role r ON e.role_id = r.role_id
         WHERE e.username = @username
@@ -36,14 +36,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
-    const isAdmin =
-      employee.role_name?.toLowerCase() === "admin" ||
-      employee.role_name?.toLowerCase() === "administrator"
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: "Access denied: admin role required" }, { status: 403 })
-    }
-
     return NextResponse.json({
       success: true,
       user: {
@@ -51,6 +43,7 @@ export async function POST(req: NextRequest) {
         username: employee.username,
         name: employee.name,
         role: employee.role_name,
+        programId: employee.program_id,
       },
     })
   } catch (error) {

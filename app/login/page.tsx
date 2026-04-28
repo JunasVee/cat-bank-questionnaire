@@ -26,7 +26,12 @@ export default function LoginPage() {
     const result = await login(username, password)
 
     if (result.success) {
-      router.push("/")
+      const role = result.role?.toLowerCase()
+      if (role === "admin" || role === "administrator") {
+        router.push("/admin/question-bank")
+      } else {
+        router.push("/dashboard")
+      }
     } else {
       setError(result.error ?? "Invalid username or password")
       setIsLoggingIn(false)
@@ -36,22 +41,21 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* CAT Logo/Header */}
         <div className="text-center mb-8">
           <img
             src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_yUxwN9SIJTwHDlctwXQONXZNcoLBJ1KT7A&s"
             alt="Caterpillar Logo"
             className="h-20 w-auto mx-auto mb-4"
           />
-          <h1 className="text-2xl font-bold text-foreground">Questionnaire Admin</h1>
-          <p className="text-muted-foreground mt-1">Employee Bank Questionnaire</p>
+          <h1 className="text-2xl font-bold text-foreground">SAR System</h1>
+          <p className="text-muted-foreground mt-1">Skill Assessment & Recognition</p>
         </div>
 
         <Card className="border-border shadow-lg">
           <CardHeader className="space-y-1">
-            <CardTitle className="text-xl">Admin Login</CardTitle>
+            <CardTitle className="text-xl">Sign In</CardTitle>
             <CardDescription>
-              Enter your credentials to access the admin panel
+              Enter your credentials to access the system
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -115,7 +119,7 @@ export default function LoginPage() {
 
             <div className="mt-6 pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground text-center">
-                Caterpillar Inc. Internal Use Only
+                PT Trakindo Utama — Internal Use Only
               </p>
             </div>
           </CardContent>

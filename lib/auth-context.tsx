@@ -8,17 +8,21 @@ interface AuthUser {
   username: string
   name: string
   role: string
+  programId?: number
 }
 
 interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   user: AuthUser | null
-  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string; role?: string }>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Routes that don't require authentication
+const PUBLIC_PATHS = ["/login"]
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -38,16 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      const isAdminRoute = pathname === "/" || pathname.startsWith("/admin")
-      const isLoginPage = pathname === "/login"
-      if (isAdminRoute && !isLoginPage) {
-        router.push("/login")
-      }
+    if (!isLoading && !isAuthenticated && !PUBLIC_PATHS.includes(pathname)) {
+      router.push("/login")
     }
   }, [isAuthenticated, isLoading, pathname, router])
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string; role?: string }> => {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user)
       sessionStorage.setItem("cat-admin-auth", "authenticated")
       sessionStorage.setItem("cat-admin-user", JSON.stringify(data.user))
-      return { success: true }
+      return { success: true, role: data.user.role }
     } catch {
       return { success: false, error: "Network error. Please try again." }
     }
