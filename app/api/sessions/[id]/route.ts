@@ -76,6 +76,35 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       }
 
+      // Update skill_progress based on exam result
+      if (status === "completed" || status === "terminated") {
+        const assessmentRow = await new sql.Request(transaction)
+          .input("assessmentId", sql.Int, assessmentId)
+          .query(`SELECT employee_id, skill_id FROM trx_assessment WHERE assessment_id = @assessmentId`)
+
+        if (assessmentRow.recordset.length > 0) {
+          const { employee_id, skill_id } = assessmentRow.recordset[0]
+          const progressStatus = passed === true ? "competent" : "not_competent"
+
+          await new sql.Request(transaction)
+            .input("employeeId", sql.Int, employee_id)
+            .input("skillId", sql.Int, skill_id)
+            .input("progressStatus", sql.VarChar(50), progressStatus)
+            .input("assessmentId", sql.Int, assessmentId)
+            .query(`
+              IF EXISTS (SELECT 1 FROM trx_skill_progress WHERE employee_id = @employeeId AND skill_id = @skillId)
+                UPDATE trx_skill_progress SET
+                  status = @progressStatus,
+                  last_assessment_id = @assessmentId,
+                  updated_at = GETDATE()
+                WHERE employee_id = @employeeId AND skill_id = @skillId
+              ELSE
+                INSERT INTO trx_skill_progress (employee_id, skill_id, status, last_assessment_id)
+                VALUES (@employeeId, @skillId, @progressStatus, @assessmentId)
+            `)
+        }
+      }
+
       await transaction.commit()
       return NextResponse.json({ success: true })
     } catch (err) {

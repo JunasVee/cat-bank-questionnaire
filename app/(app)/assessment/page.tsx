@@ -71,11 +71,24 @@ export default function AssessmentPage() {
   const examSubmitted = step === "result"
 
   useEffect(() => {
-    if (!user?.programId) return
+    if (!user?.id) return
     setIsLoadingList(true)
-    fetch(`/api/questionnaires?programId=${user.programId}&active=true`)
+    // Only show questionnaires where the employee has an approved validation request
+    fetch(`/api/skill-progress?employeeId=${user.id}`)
       .then((r) => r.json())
-      .then((data) => setAvailableQuestionnaires(Array.isArray(data) ? data : []))
+      .then(async (skills: any[]) => {
+        const approvedSkillIds = new Set(
+          (Array.isArray(skills) ? skills : [])
+            .filter((s) => s.status === "approved")
+            .map((s) => s.skillId)
+        )
+        if (approvedSkillIds.size === 0) { setAvailableQuestionnaires([]); return }
+        const res = await fetch(`/api/questionnaires?active=true`)
+        const all = await res.json()
+        setAvailableQuestionnaires(
+          (Array.isArray(all) ? all : []).filter((q: any) => approvedSkillIds.has(parseInt(q.id)))
+        )
+      })
       .catch(() => setAvailableQuestionnaires([]))
       .finally(() => setIsLoadingList(false))
   }, [user])
@@ -223,8 +236,11 @@ export default function AssessmentPage() {
           </div>
         ) : availableQuestionnaires.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              No assessments available for your program at this time.
+            <CardContent className="py-12 text-center">
+              <p className="font-medium text-muted-foreground">No approved assessments available.</p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+                Go to <strong>Skill Validation → My Validation Request</strong>, submit a request, and once your supervisor approves it the exam will appear here.
+              </p>
             </CardContent>
           </Card>
         ) : (
