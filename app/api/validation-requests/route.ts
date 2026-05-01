@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/validation-requests — employee submits a new request
+// POST /api/validation-requests — employee submits a new (or resubmits a revision) request
 export async function POST(req: NextRequest) {
   try {
     const { employeeId, skillId, notes } = await req.json()
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     await transaction.begin()
 
     try {
-      // Get supervisor_id from employee record
+      // 1. Get supervisor_id from employee record
       const empResult = await new sql.Request(transaction)
         .input("employeeId", sql.Int, parseInt(employeeId))
         .query(`SELECT supervisor_id FROM mst_employee WHERE employee_id = @employeeId`)
@@ -123,41 +123,75 @@ export async function POST(req: NextRequest) {
       const supervisorId = empResult.recordset[0]?.supervisor_id
       if (!supervisorId) {
         await transaction.rollback()
-        return NextResponse.json({ error: "No supervisor assigned to this employee" }, { status: 400 })
+        return NextResponse.json(
+          { error: "No supervisor assigned. Please contact your administrator." },
+          { status: 400 }
+        )
       }
 
-      // Check for existing pending/approved request for same skill
-      const existing = await new sql.Request(transaction)
+      // 2. Block if there is already an active pending or approved request
+      const blocking = await new sql.Request(transaction)
         .input("employeeId", sql.Int, parseInt(employeeId))
         .input("skillId", sql.Int, parseInt(skillId))
         .query(`
           SELECT request_id FROM trx_validation_request
           WHERE employee_id = @employeeId AND skill_id = @skillId
-            AND status IN ('pending', 'approved', 'revision_required')
+            AND status IN ('pending', 'approved')
         `)
 
-      if (existing.recordset.length > 0) {
+      if (blocking.recordset.length > 0) {
         await transaction.rollback()
-        return NextResponse.json({ error: "An active request already exists for this skill" }, { status: 409 })
+        return NextResponse.json(
+          { error: "An active request already exists for this skill. Wait for the supervisor's decision." },
+          { status: 409 }
+        )
       }
 
-      // Insert validation request
-      const result = await new sql.Request(transaction)
+      // 3. Check for a revision_required request → resubmit (update existing)
+      const revisionReq = await new sql.Request(transaction)
         .input("employeeId", sql.Int, parseInt(employeeId))
         .input("skillId", sql.Int, parseInt(skillId))
-        .input("supervisorId", sql.Int, supervisorId)
-        .input("notes", sql.NVarChar(500), notes ?? null)
         .query(`
-          INSERT INTO trx_validation_request
-            (employee_id, skill_id, supervisor_id, employee_notes, status, request_date)
-          OUTPUT INSERTED.request_id
-          VALUES
-            (@employeeId, @skillId, @supervisorId, @notes, 'pending', GETDATE())
+          SELECT request_id FROM trx_validation_request
+          WHERE employee_id = @employeeId AND skill_id = @skillId
+            AND status = 'revision_required'
         `)
 
-      const requestId = result.recordset[0].request_id
+      let requestId: number
 
-      // Update skill progress → requesting_validation
+      if (revisionReq.recordset.length > 0) {
+        // Resubmit: reset existing request back to pending with updated notes
+        const existingId = revisionReq.recordset[0].request_id
+        await new sql.Request(transaction)
+          .input("requestId", sql.Int, existingId)
+          .input("notes", sql.NVarChar(500), notes ?? null)
+          .query(`
+            UPDATE trx_validation_request SET
+              status = 'pending',
+              request_date = GETDATE(),
+              employee_notes = @notes,
+              supervisor_notes = NULL,
+              decision_date = NULL
+            WHERE request_id = @requestId
+          `)
+        requestId = existingId
+      } else {
+        // Brand-new request
+        const result = await new sql.Request(transaction)
+          .input("employeeId", sql.Int, parseInt(employeeId))
+          .input("skillId", sql.Int, parseInt(skillId))
+          .input("supervisorId", sql.Int, supervisorId)
+          .input("notes", sql.NVarChar(500), notes ?? null)
+          .query(`
+            INSERT INTO trx_validation_request
+              (employee_id, skill_id, supervisor_id, employee_notes, status, request_date)
+            OUTPUT INSERTED.request_id
+            VALUES (@employeeId, @skillId, @supervisorId, @notes, 'pending', GETDATE())
+          `)
+        requestId = result.recordset[0].request_id
+      }
+
+      // 4. Update (or create) skill_progress → requesting_validation
       await new sql.Request(transaction)
         .input("employeeId", sql.Int, parseInt(employeeId))
         .input("skillId", sql.Int, parseInt(skillId))

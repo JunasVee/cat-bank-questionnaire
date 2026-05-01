@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getConnection, sql } from "@/lib/db"
 
 // GET /api/skill-progress?employeeId=X
+// Returns all active skills that belong to the employee's program, with their progress status
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -26,13 +27,16 @@ export async function GET(req: NextRequest) {
           sp.last_assessment_id,
           ta.score  AS last_score,
           ta.passed AS last_passed
-        FROM mst_skill s
-        LEFT JOIN mst_program p ON s.program_id = p.program_id
+        FROM mst_employee e
+        JOIN mst_skill s
+          ON s.program_id = e.program_id AND s.is_active = 1
+        LEFT JOIN mst_program p
+          ON s.program_id = p.program_id
         LEFT JOIN trx_skill_progress sp
           ON sp.skill_id = s.skill_id AND sp.employee_id = @employeeId
         LEFT JOIN trx_assessment ta
           ON ta.assessment_id = sp.last_assessment_id
-        WHERE s.is_active = 1
+        WHERE e.employee_id = @employeeId
         ORDER BY p.program_name, s.skill_name
       `)
 
