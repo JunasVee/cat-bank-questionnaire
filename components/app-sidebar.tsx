@@ -203,6 +203,7 @@ const ADMIN_MENUS = [
     title: "System Configuration",
     icon: Settings,
     items: [
+      { title: "Exam Monitoring", href: "/admin/monitoring", icon: Bell },
       { title: "General Config", href: "/admin/config", icon: Settings2 },
       { title: "Integration Config", href: "/admin/integrations", icon: Link2 },
       { title: "Audit Log", href: "/admin/audit-log", icon: ScrollText },

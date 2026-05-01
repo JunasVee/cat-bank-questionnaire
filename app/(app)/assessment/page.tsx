@@ -71,11 +71,15 @@ export default function AssessmentPage() {
   const examSubmitted = step === "result"
 
   useEffect(() => {
-    if (!user?.programId) return
+    if (!user?.id) return
     setIsLoadingList(true)
-    fetch(`/api/questionnaires?programId=${user.programId}&active=true`)
+    // Fetch skills where this employee has status='approved' — dedicated endpoint,
+    // no program-filter dependency.
+    fetch(`/api/assessments/available?employeeId=${user.id}`)
       .then((r) => r.json())
-      .then((data) => setAvailableQuestionnaires(Array.isArray(data) ? data : []))
+      .then((data: any[]) => {
+        setAvailableQuestionnaires(Array.isArray(data) ? data : [])
+      })
       .catch(() => setAvailableQuestionnaires([]))
       .finally(() => setIsLoadingList(false))
   }, [user])
@@ -223,8 +227,11 @@ export default function AssessmentPage() {
           </div>
         ) : availableQuestionnaires.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              No assessments available for your program at this time.
+            <CardContent className="py-12 text-center">
+              <p className="font-medium text-muted-foreground">No approved assessments available.</p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+                Go to <strong>Skill Validation → My Validation Request</strong>, submit a request, and once your supervisor approves it the exam will appear here.
+              </p>
             </CardContent>
           </Card>
         ) : (
@@ -244,7 +251,7 @@ export default function AssessmentPage() {
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{q.description}</p>
                       )}
                       <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>{(q as any).questionCount ?? q.questions.length} questions</span>
+                        <span>{(q as any).questionCount ?? 0} questions</span>
                         <span>Pass: {q.passingScore}%</span>
                         <span>{q.timeLimit} min</span>
                       </div>
