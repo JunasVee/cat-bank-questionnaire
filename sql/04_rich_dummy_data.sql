@@ -492,6 +492,17 @@ IF NOT EXISTS (SELECT 1 FROM mst_skill WHERE skill_code = 'MNT-S4-002')
     WHERE p.program_name = 'Maintenance' AND ps.stage_name = 'Maintenance Lead';
 
 -- ============================================================
+-- 6b. ENSURE updated_at COLUMN EXISTS ON trx_skill_progress
+-- (may be absent if the table was created before 03_skill_tracking.sql)
+-- ============================================================
+IF NOT EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID('trx_skill_progress') AND name = 'updated_at'
+)
+    ALTER TABLE trx_skill_progress
+        ADD updated_at DATETIME NOT NULL DEFAULT GETDATE();
+
+-- ============================================================
 -- 7. SKILL PROGRESS — emp_john (1002) — Operations
 --    Stage 1: all competent | Stage 2: 2 competent + 1 requesting_validation
 --    Stage 3-4: not_started
