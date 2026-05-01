@@ -73,21 +73,12 @@ export default function AssessmentPage() {
   useEffect(() => {
     if (!user?.id) return
     setIsLoadingList(true)
-    // Only show questionnaires where the employee has an approved validation request
-    fetch(`/api/skill-progress?employeeId=${user.id}`)
+    // Fetch skills where this employee has status='approved' — dedicated endpoint,
+    // no program-filter dependency.
+    fetch(`/api/assessments/available?employeeId=${user.id}`)
       .then((r) => r.json())
-      .then(async (skills: any[]) => {
-        const approvedSkillIds = new Set(
-          (Array.isArray(skills) ? skills : [])
-            .filter((s) => s.status === "approved")
-            .map((s) => s.skillId)
-        )
-        if (approvedSkillIds.size === 0) { setAvailableQuestionnaires([]); return }
-        const res = await fetch(`/api/questionnaires?active=true`)
-        const all = await res.json()
-        setAvailableQuestionnaires(
-          (Array.isArray(all) ? all : []).filter((q: any) => approvedSkillIds.has(parseInt(q.id)))
-        )
+      .then((data: any[]) => {
+        setAvailableQuestionnaires(Array.isArray(data) ? data : [])
       })
       .catch(() => setAvailableQuestionnaires([]))
       .finally(() => setIsLoadingList(false))
@@ -260,7 +251,7 @@ export default function AssessmentPage() {
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{q.description}</p>
                       )}
                       <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                        <span>{(q as any).questionCount ?? q.questions.length} questions</span>
+                        <span>{(q as any).questionCount ?? 0} questions</span>
                         <span>Pass: {q.passingScore}%</span>
                         <span>{q.timeLimit} min</span>
                       </div>
